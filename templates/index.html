@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analizador de Sentimientos con Excel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .tab-container {
+            margin-top: 20px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            background: #e9ecef;
+            border: none;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+            cursor: pointer;
+        }
+        .tab.active {
+            background: #007bff;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 0 5px 5px 5px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        textarea {
+            width: 100%;
+            height: 120px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            resize: vertical;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .positive { background: #d4edda; border-left: 5px solid #28a745; }
+        .negative { background: #f8d7da; border-left: 5px solid #dc3545; }
+        .neutral { background: #fff3cd; border-left: 5px solid #ffc107; }
+        .file-input {
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .summary {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+        .summary-item {
+            text-align: center;
+            padding: 15px;
+            border-radius: 5px;
+            color: white;
+        }
+        .summary-positive { background: #28a745; }
+        .summary-negative { background: #dc3545; }
+        .summary-neutral { background: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Analizador de Sentimientos con Excel</h1>
+        <p>Analiza sentimientos en textos españoles usando NLTK VADER y traducción automática</p>
+        
+        <div class="tab-container">
+            <div class="tabs">
+                <button class="tab active" onclick="openTab('text-tab')">📝 Análisis de Texto</button>
+                <button class="tab" onclick="openTab('excel-tab')">📊 Análisis de Excel</button>
+            </div>
+            
+            <!-- Pestaña de Análisis de Texto -->
+            <div id="text-tab" class="tab-content active">
+                <h3>Analizar Texto Individual</h3>
+                <textarea id="textInput" placeholder="Escribe tu texto en español aquí..."></textarea>
+                <br>
+                <button onclick="analyzeText()">🔍 Analizar Sentimiento</button>
+                <button onclick="clearText()">🗑️ Limpiar</button>
+                
+                <div id="text-result"></div>
+            </div>
+            
+            <!-- Pestaña de Análisis de Excel -->
+            <div id="excel-tab" class="tab-content">
+                <h3>Analizar Archivo Excel </h3>
+                <p>Sube un archivo Excel (.xls o .xlsx) para analizar automáticamente todos los textos</p>
+                
+                <div class="file-input">
+                    <input type="file" id="excelFile" accept=".xls,.xlsx">
+                    <button onclick="analyzeExcel()">📤 Analizar Excel</button>
+                    
+                </div>
+                
+                <div id="excel-result"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openTab(tabName) {
+            // Ocultar todas las pestañas
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Mostrar la pestaña seleccionada
+            document.getElementById(tabName).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+        
+        function analyzeText() {
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) {
+                alert('Por favor, escribe algún texto');
+                return;
+            }
+            
+            document.getElementById('text-result').innerHTML = '<div class="loading">🔄 Analizando...</div>';
+            
+            fetch('/analyze', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({text: text})
+            })
+            .then(response => response.json())
+            .then(data => {
+                displayTextResult(data);
+            })
+            .catch(error => {
+                document.getElementById('text-result').innerHTML = '<div class="negative">❌ Error al conectar con el servidor</div>';
+            });
+        }
+        
+        function displayTextResult(data) {
+            if (data.error) {
+                document.getElementById('text-result').innerHTML = `<div class="negative">❌ Error: ${data.error}</div>`;
+                return;
+            }
+            
+            const sentimentClass = data.analisis.categoria;
+            const emoji = data.analisis.sentimiento.split(' ')[0];
+            
+            let resultHTML = `<div class="result ${sentimentClass}">`;
+            resultHTML += `<h3>${emoji} ${data.analisis.sentimiento}</h3>`;
+            resultHTML += `<p><strong>Texto original:</strong> "${data.texto_original}"</p>`;
+            resultHTML += `<p><strong>Texto traducido:</strong> "${data.texto_traducido}"</p>`;
+            resultHTML += `<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 15px 0;">`;
+            resultHTML += `<div style="background: #dc3545; color: white; padding: 10px; border-radius: 5px; text-align: center;">`;
+            resultHTML += `<strong>Negativo</strong><br>${data.analisis.negativo}</div>`;
+            resultHTML += `<div style="background: #ffc107; color: black; padding: 10px; border-radius: 5px; text-align: center;">`;
+            resultHTML += `<strong>Neutral</strong><br>${data.analisis.neutral}</div>`;
+            resultHTML += `<div style="background: #28a745; color: white; padding: 10px; border-radius: 5px; text-align: center;">`;
+            resultHTML += `<strong>Positivo</strong><br>${data.analisis.positivo}</div>`;
+            resultHTML += `</div>`;
+            resultHTML += `<p><strong>Puntuación compuesta:</strong> ${data.analisis.compound}</p>`;
+            resultHTML += `</div>`;
+            
+            document.getElementById('text-result').innerHTML = resultHTML;
+        }
+        
+        function analyzeExcel() {
+            const fileInput = document.getElementById('excelFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Por favor, selecciona un archivo Excel');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            document.getElementById('excel-result').innerHTML = '<div class="loading">🔄 Analizando archivo Excel...</div>';
+            
+            fetch('/analyze-excel', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                displayExcelResult(data);
+            })
+            .catch(error => {
+                document.getElementById('excel-result').innerHTML = '<div class="negative">❌ Error al procesar el archivo</div>';
+            });
+        }
+        
+        function displayExcelResult(data) {
+            if (data.error) {
+                document.getElementById('excel-result').innerHTML = `<div class="negative">❌ Error: ${data.error}</div>`;
+                return;
+            }
+            
+            let resultHTML = `<h3>📊 Resultados del Análisis (${data.total_analizados} textos analizados)</h3>`;
+            
+            // Resumen
+            resultHTML += `<div class="summary">`;
+            resultHTML += `<div class="summary-item summary-positive">`;
+            resultHTML += `<strong>Positivos</strong><br>${data.resumen_categorias.positivo}</div>`;
+            resultHTML += `<div class="summary-item summary-neutral">`;
+            resultHTML += `<strong>Neutros</strong><br>${data.resumen_categorias.neutro}</div>`;
+            resultHTML += `<div class="summary-item summary-negative">`;
+            resultHTML += `<strong>Negativos</strong><br>${data.resumen_categorias.negativo}</div>`;
+            resultHTML += `</div>`;
+            
+            // Tabla de resultados
+            resultHTML += `<table>`;
+            resultHTML += `<tr><th>Fila</th><th>Columna</th><th>Texto Original</th><th>Sentimiento</th><th>Compound</th><th>Positivo</th><th>Neutral</th><th>Negativo</th></tr>`;
+            
+            data.resultados.forEach(item => {
+                resultHTML += `<tr>`;
+                resultHTML += `<td>${item.fila}</td>`;
+                resultHTML += `<td>${item.columna}</td>`;
+                resultHTML += `<td>${item.texto_original}</td>`;
+                resultHTML += `<td>${item.sentimiento}</td>`;
+                resultHTML += `<td>${item.compound}</td>`;
+                resultHTML += `<td>${item.positivo}</td>`;
+                resultHTML += `<td>${item.neutral}</td>`;
+                resultHTML += `<td>${item.negativo}</td>`;
+                resultHTML += `</tr>`;
+            });
+            
+            resultHTML += `</table>`;
+            
+            document.getElementById('excel-result').innerHTML = resultHTML;
+        }
+        
+        function downloadTemplate() {
+            window.open('/download-template', '_blank');
+        }
+        
+        function clearText() {
+            document.getElementById('textInput').value = '';
+            document.getElementById('text-result').innerHTML = '';
+        }
+        
+        // Ejemplos rápidos
+        function loadExample(text) {
+            document.getElementById('textInput').value = text;
+            analyzeText();
+        }
+    </script>
+</body>
+</html>
